@@ -1,0 +1,491 @@
+// Bordfolie.com DK — Chat Widget (dansk)
+(function () {
+  'use strict';
+
+  const WORKER_URL = 'https://bordfolie-dk.metsukisutemi.workers.dev/';
+
+  function getUTM() {
+    return {
+      source:   new URLSearchParams(location.search).get('utm_source')   || sessionStorage.getItem('bf_utm_source')   || '',
+      medium:   new URLSearchParams(location.search).get('utm_medium')   || sessionStorage.getItem('bf_utm_medium')   || '',
+      campaign: new URLSearchParams(location.search).get('utm_campaign') || sessionStorage.getItem('bf_utm_campaign') || '',
+    };
+  }
+  ['source','medium','campaign'].forEach(k => {
+    const v = new URLSearchParams(location.search).get('utm_'+k);
+    if (v) sessionStorage.setItem('bf_utm_'+k, v);
+  });
+
+  function genSID() { return '№ ' + String(Math.floor(100000 + Math.random() * 900000)); }
+
+  const CSS = `
+    #bf-root{position:fixed;bottom:24px;right:24px;z-index:2147483647;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+    #bf-btn{width:58px;height:58px;border-radius:50%;background:#1c3d2e;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.22);transition:transform .2s,box-shadow .2s;position:relative;animation:bf-pulse 1.9s ease-out infinite;}
+    #bf-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.28);animation-play-state:paused;}
+    @keyframes bf-pulse{0%{box-shadow:0 4px 16px rgba(0,0,0,.22),0 0 0 0 rgba(28,61,46,.45);}70%{box-shadow:0 4px 16px rgba(0,0,0,.22),0 0 0 13px rgba(28,61,46,0);}100%{box-shadow:0 4px 16px rgba(0,0,0,.22),0 0 0 0 rgba(28,61,46,0);}}
+    #bf-btn svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+    #bf-tooltip{position:absolute;bottom:68px;right:0;background:#1c3d2e;color:#fff;font-size:13px;padding:10px 14px;border-radius:12px 12px 0 12px;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.2);display:none;cursor:pointer;line-height:1.4;}
+    #bf-tooltip:after{content:'';position:absolute;bottom:-6px;right:16px;border:6px solid transparent;border-top-color:#1c3d2e;border-bottom:none;}
+    #bf-box{position:absolute;bottom:70px;right:0;width:340px;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);display:flex;flex-direction:column;overflow:hidden;max-height:calc(100vh - 120px);transition:opacity .2s,transform .2s;transform-origin:bottom right;}
+    #bf-box.hidden{opacity:0;transform:scale(.95) translateY(8px);pointer-events:none;}
+    #bf-hd{background:#1c3d2e;padding:14px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+    .bf-hav{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0;}
+    .bf-htxt{flex:1;min-width:0;}
+    .bf-hname{color:#fff;font-size:14px;font-weight:600;}
+    .bf-hsub{color:rgba(255,255,255,.6);font-size:11px;margin-top:2px;display:flex;align-items:center;gap:5px;}
+    .bf-online{width:6px;height:6px;background:#68d391;border-radius:50%;animation:bf-op 2s infinite;}
+    @keyframes bf-op{0%,100%{opacity:1}50%{opacity:.4}}
+    #bf-x{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.5);font-size:18px;line-height:1;padding:2px 4px;transition:color .15s;flex-shrink:0;}
+    #bf-x:hover{color:#fff;}
+    #bf-sid{text-align:center;font-size:10px;color:#b8b0a4;padding:3px 0;background:#f7f6f3;font-family:monospace;flex-shrink:0;}
+    #bf-trust{display:flex;justify-content:center;background:#eef3ee;flex-shrink:0;border-bottom:1px solid #dde8dd;}
+    .bf-ti{flex:1;text-align:center;font-size:10px;font-weight:600;color:#2c5840;padding:5px 2px;}
+    #bf-log{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px;background:#f7f6f3;min-height:220px;max-height:300px;}
+    #bf-log::-webkit-scrollbar{width:3px;}
+    #bf-log::-webkit-scrollbar-thumb{background:#d0c8bc;border-radius:2px;}
+    .bf-row{display:flex;align-items:flex-end;gap:7px;}.bf-row.u{flex-direction:row-reverse;}
+    .bf-ava{width:26px;height:26px;border-radius:50%;background:#1c3d2e;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;}
+    .bf-bubble{max-width:78%;padding:9px 13px;font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap;border-radius:14px;}
+    .bf-row.b .bf-bubble{background:#fff;color:#1a1a1a;border-bottom-left-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+    .bf-row.u .bf-bubble{background:#1c3d2e;color:#fff;border-bottom-right-radius:3px;}
+    .bf-typing .bf-bubble{padding:11px 14px;}
+    .bf-dots span{display:inline-block;width:6px;height:6px;background:#b0a898;border-radius:50%;margin:0 2px;animation:bf-b 1.2s infinite;}
+    .bf-dots span:nth-child(2){animation-delay:.2s}.bf-dots span:nth-child(3){animation-delay:.4s}
+    @keyframes bf-b{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+    .bf-ts{text-align:center;font-size:11px;color:#b8b0a4;margin:2px 0;}
+    #bf-qr{padding:6px 10px 4px;display:flex;flex-wrap:wrap;gap:6px;background:#f7f6f3;flex-shrink:0;}
+    .bf-qbtn{background:#fff;border:1.5px solid #1c3d2e;color:#1c3d2e;border-radius:20px;padding:6px 13px;font-size:13px;cursor:pointer;transition:all .15s;font-family:inherit;line-height:1.3;}
+    .bf-qbtn:hover{background:#1c3d2e;color:#fff;}
+    .bf-pay-loading{margin:8px 12px;padding:14px;border-radius:14px;background:#f7f7f5;border:1px solid #ece7de;}
+    .bf-pay-loading-top{font-size:13px;color:#374151;line-height:1.45;margin-bottom:10px;text-align:center;}
+    .bf-pay-loading-btn{display:flex;align-items:center;justify-content:center;gap:10px;min-width:218px;max-width:100%;margin:0 auto;background:linear-gradient(180deg,#1a1a1a 0%,#0d0d0d 100%);color:#fff;border-radius:14px;padding:11px 15px;border:1.5px solid #171717;opacity:.92;}
+    .bf-spinner{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.28);border-top-color:#fff;animation:bf-spin .8s linear infinite;}
+    @keyframes bf-spin{to{transform:rotate(360deg);}}
+    .bf-pay-ready{padding:8px 12px;}
+    .bf-pay-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;background:linear-gradient(180deg,#1a1a1a 0%,#0d0d0d 100%);color:#fff;text-decoration:none;padding:11px 15px;border-radius:14px;font-size:16px;font-weight:800;box-shadow:0 8px 20px rgba(0,0,0,.16);transition:transform .15s,box-shadow .15s;min-width:218px;max-width:100%;border:1.5px solid #171717;display:flex;justify-content:center;}
+    .bf-pay-btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(0,0,0,.20);}
+    .bf-pay-note{font-size:12px;color:#6b7280;text-align:center;margin-top:2px;}
+    .bf-cod-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 14px;font-size:13px;color:#15803d;text-align:center;margin:4px 12px;}
+    #bf-ft{display:flex;gap:8px;padding:10px 12px;border-top:1px solid #ede8e0;background:#fff;flex-shrink:0;align-items:flex-end;}
+    #bf-ta{flex:1;border:1.5px solid #ddd7ce;border-radius:10px;padding:9px 12px;font-size:14px;line-height:1.4;resize:none;outline:none;max-height:80px;font-family:inherit;color:#1a1a1a;background:#faf8f5;transition:border-color .15s;}
+    #bf-ta:focus{border-color:#1c3d2e;background:#fff;}
+    #bf-ta::placeholder{color:#b8b0a4;}
+    #bf-go{width:38px;height:38px;border-radius:10px;background:#1c3d2e;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;padding:0;align-self:flex-end;}
+    #bf-go:hover{background:#142d21;}#bf-go:disabled{background:#c5bdb4;cursor:not-allowed;}
+    #bf-go svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+    #bf-pw{text-align:center;font-size:10px;color:#c5bdb4;padding:5px;background:#fff;flex-shrink:0;border-top:1px solid #f0ebe2;}
+    @media(max-width:400px){#bf-root{bottom:16px;right:16px;}#bf-box{width:calc(100vw - 32px);right:0;}}
+  `;
+
+  const SID = genSID();
+  let open=false, busy=false, started=false, hist=[];
+  let ses={
+    name:null,phone:null,email:null,contact:null,circleSize:null,
+    price:null,product:null,address:null,paymentMethod:null,total:null,delivery:null,stripeUrl:null,
+    leadFired:false,phoneRequest:false,paymentLinkSent:false,
+    pendingAddressParts:[],sessionSavedOnce:false,_saveTimer:null,_warmLeadSent:false,
+  };
+
+  function build(){
+    const s=document.createElement('style');s.textContent=CSS;document.head.appendChild(s);
+    const r=document.createElement('div');r.id='bf-root';
+    r.innerHTML=`
+      <div id="bf-box" class="hidden">
+        <div id="bf-hd">
+          <div class="bf-hav">S</div>
+          <div class="bf-htxt">
+            <div class="bf-hname">Sara — Salgsrådgiver</div>
+            <div class="bf-hsub"><span class="bf-online"></span>bordfolie.com</div>
+          </div>
+          <button id="bf-x">✕</button>
+        </div>
+        <div id="bf-sid">Bestillings-ID: ${SID}</div>
+        <div id="bf-trust">
+          <span class="bf-ti">✓ 100.000+ ordrer</span>
+          <span class="bf-ti">✓ Sikker betaling</span>
+          <span class="bf-ti">✓ Tilskåret på mål</span>
+        </div>
+        <div id="bf-log" role="log" aria-live="polite"></div>
+        <div id="bf-qr"></div>
+        <div id="bf-ft">
+          <textarea id="bf-ta" rows="1" placeholder="Skriv en besked…"></textarea>
+          <button id="bf-go">
+            <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        <div id="bf-pw">bordfolie.com</div>
+      </div>
+      <div id="bf-tooltip">Beregn prisen på din bordfolie på 30 sek. 👋</div>
+      <button id="bf-btn">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+    `;
+    document.body.appendChild(r);
+  }
+
+  const el=id=>document.getElementById(id);
+  function scroll(){const l=el('bf-log');l.scrollTop=l.scrollHeight;}
+  function addTime(){const d=new Date(),t=document.createElement('div');t.className='bf-ts';t.textContent=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');el('bf-log').appendChild(t);}
+  function addBot(text){
+    el('bf-log').querySelector('.bf-typing')?.remove();
+    const row=document.createElement('div');row.className='bf-row b';
+    row.innerHTML=`<div class="bf-ava">S</div><div class="bf-bubble">${text.replace(/\n/g,'<br>')}</div>`;
+    el('bf-log').appendChild(row);scroll();
+  }
+  function addUser(text){
+    const row=document.createElement('div');row.className='bf-row u';
+    row.innerHTML=`<div class="bf-bubble">${text.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>`;
+    el('bf-log').appendChild(row);clearQR();scroll();
+  }
+  function showTyping(){
+    const row=document.createElement('div');row.className='bf-row b bf-typing';
+    row.innerHTML=`<div class="bf-ava">S</div><div class="bf-bubble"><span class="bf-dots"><span></span><span></span><span></span></span></div>`;
+    el('bf-log').appendChild(row);scroll();
+  }
+  function lock(v){el('bf-ta').disabled=v;el('bf-go').disabled=v;}
+  function setQR(buttons){const qr=el('bf-qr');qr.innerHTML='';buttons.forEach(label=>{const btn=document.createElement('button');btn.className='bf-qbtn';btn.textContent=label;btn.onclick=()=>send(label);qr.appendChild(btn);});}
+  function clearQR(){el('bf-qr').innerHTML='';}
+
+  function detectQR(botText){
+    const questionCount=(botText.match(/[?]/g)||[]).length;
+    if(questionCount>1)return;
+    if(ses.paymentLinkSent)return;
+    if(/bestillingen er modtaget/i.test(botText))return;
+    const t=botText.toLowerCase();
+    if(/slags bordplade|hvilken.*bordplade|mat træ|glas.*lak/i.test(t)){
+      setQR(['Mat træ','Glas / lak / blank','Laminat']);
+    }else if(/intensiv.*brug|køkken.*barn|lettere.*brug|sjæld/i.test(t)&&!ses.price){
+      setQR(['Intensiv brug (køkken/børn)','Lettere brug (skrivebord/stue)']);
+    }else if(/1,5mm.*2mm|2mm.*1,5mm/i.test(t)&&!ses.price){
+      setQR(['1,5mm — billigere','2mm — mere holdbar']);
+    }else if(/mål i cm|angiv.*mål|bordmål/i.test(t)&&!ses.price){
+      setQR(['80×60 cm','100×80 cm','120×80 cm','140×80 cm','160×90 cm','Andre mål']);
+    }else if(/rundt.*bord|firkantet|okrągły/i.test(t)){
+      setQR(['Ja, rundt bord','Nej, firkantet']);
+    }else if(/andre borde|flere borde/i.test(t)){
+      setQR(['Ja, jeg har flere','Nej, det er alt']);
+    }else if(/mobilepay.*kort|kontant.*levering|hvordan.*betale/i.test(t)){
+      setQR(['💳 Online (MobilePay/kort)','🚚 Kontant ved levering']);
+    }
+  }
+
+  function clearPaymentUi(){el('bf-log').querySelectorAll('#bf-pay-state,.bf-pay-loading,.bf-pay-ready').forEach(n=>n.remove());}
+
+  function showPaymentLoading(total){
+    clearQR();clearPaymentUi();
+    const sidEl=el('bf-sid');if(sidEl)sidEl.textContent='Bestillings-ID: '+SID;
+    const w=document.createElement('div');w.id='bf-pay-state';w.className='bf-pay-loading';
+    w.innerHTML='<div class="bf-pay-loading-top">Forbereder sikkert betalingslink. Tager normalt få sekunder.</div>'+
+      '<div class="bf-pay-loading-btn"><span class="bf-spinner"></span><span>Genererer link — '+total+' kr</span></div>'+
+      '<div class="bf-pay-note">Knappen til MobilePay/kort vises, når linket er klar.</div>';
+    el('bf-log').appendChild(w);scroll();
+  }
+
+  function showPayBtn(url,total){
+    clearQR();clearPaymentUi();
+    const sidEl=el('bf-sid');if(sidEl)sidEl.textContent='Bestillings-ID: '+SID;
+    const w=document.createElement('div');w.id='bf-pay-state';w.className='bf-pay-ready';
+    w.innerHTML=
+      '<div style="font-size:13px;color:#374151;margin-bottom:8px;line-height:1.4;">Bestilling <strong>'+SID+'</strong> sendes til produktion efter betaling.</div>'+
+      '<div style="display:flex;justify-content:center;margin-bottom:8px;">'+
+        '<a href="'+url+'" target="_blank" rel="noopener" class="bf-pay-btn">'+
+          '<span style="font-size:17px;font-weight:900;color:#fff;">Betal '+total+' kr</span>'+
+        '</a>'+
+      '</div>'+
+      '<div class="bf-pay-note">Betalingen sker via Stripe — MobilePay eller kort.</div>'+
+      '<div style="font-size:11px;color:#9ca3af;text-align:center;cursor:pointer;margin-top:8px;" onclick="window.__bfChangeToCOD&&window.__bfChangeToCOD('+total+')">'+
+        'Skift til kontant ved levering →'+
+      '</div>';
+    el('bf-log').appendChild(w);scroll();
+    window.__bfChangeToCOD=function(t){
+      ses.paymentMethod='cod';clearPaymentUi();clearQR();showCOD(t);
+      fireUpdate('payment_changed_to_cod',{payment_method:'cod',total:t});
+      savePostPaymentUpdate('payment_changed_to_cod_button');
+    };
+  }
+
+  function showCOD(total){
+    clearQR();
+    const sidEl=el('bf-sid');if(sidEl)sidEl.textContent='Bestillings-ID: '+SID;
+    const d=document.createElement('div');d.className='bf-cod-box';
+    d.innerHTML='✅ Bestilling modtaget!<br>ID: <strong>'+SID+'</strong><br>Betaling ved levering: <strong>'+total+' kr</strong><br>Vi kontakter dig snarest.';
+    el('bf-log').appendChild(d);scroll();
+  }
+
+  async function openChat(){
+    open=true;el('bf-box').classList.remove('hidden');
+    el('bf-tooltip').style.display='none';
+    if(!started){
+      started=true;showTyping();
+      await new Promise(r=>setTimeout(r,600));
+      el('bf-log').querySelector('.bf-typing')?.remove();
+      addBot('Hej! 👋 Jeg er Sara fra bordfolie.com.\n\nJeg beregner prisen på din bordfolie på under et minut.\n\nHvilken slags bordplade har du?');
+      addTime();
+      setQR(['Mat træ','Glas / lak / blank','Laminat','Jeg har et spørgsmål']);
+    }
+    el('bf-ta').focus();
+  }
+
+  function closeChat(){
+    sessionStorage.setItem('bf_auto_block','1');
+    open=false;el('bf-box').classList.add('hidden');
+    if(!hasContactData()&&hist.length>1)saveSessionNow('close_no_contact');
+  }
+
+  // ── Data extraction (DK) ──────────────────────────────────────────────────
+  function getPhone(t){const m=String(t||'').match(/(?:\+45[\s-]?)?[0-9]{2}[\s-]?[0-9]{2}[\s-]?[0-9]{2}[\s-]?[0-9]{2}/);return m?m[0].replace(/[\s-]/g,''):null;}
+  function getEmail(t){const m=t.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);return m?m[0]:null;}
+
+  const ADDR_EXCLUDE=/^Mat træ$|^Glas \/ lak \/ blank$|^Laminat$|^Intensiv brug.*$|^Lettere brug.*$|^1,5mm.*$|^2mm.*$|^Ja, rundt bord$|^Nej, firkantet$|^Ja, jeg har flere$|^Nej, det er alt$|^(?:💳\s*)?Online.*$|^(?:🚚\s*)?Kontant.*$|^\d{2,3}[×x]\d{2,3}\s*cm$|^Andre mål$|^Jeg har et spørgsmål$/i;
+
+  function cleanMoneyDK(v){return String(v||'').replace(/\./g,'').replace(',','.');}
+  function getMoneyValuesFromLineDK(line){return[...String(line||'').matchAll(/([\d.]+(?:,\d+)?)\s*kr/gi)].map(m=>parseFloat(cleanMoneyDK(m[1]))).filter(n=>Number.isFinite(n));}
+
+  function isProductLineDK(line){
+    const l=String(line||'').trim();
+    if(!/^[-—•▪■]/.test(l))return false;
+    if(/levering|i alt|samlet|adresse|link|betaling/i.test(l))return false;
+    return /\d{2,4}\s*[xX×]\s*\d{2,4}|rund|rektangel|kvadrat|riflet|glat|klar|udsalg|cm|mm/i.test(l)&&/kr/i.test(l);
+  }
+
+  function getProductLinesDK(t){return String(t||'').split('\n').map(l=>l.trim()).filter(isProductLineDK);}
+
+  function getPriceDK(t){
+    let m=String(t||'').match(/Bordfolie i alt[:\s]+([\d.]+(?:,\d+)?)\s*kr/i);if(m)return cleanMoneyDK(m[1]);
+    m=String(t||'').match(/Folie i alt[:\s]+([\d.]+(?:,\d+)?)\s*kr/i);if(m)return cleanMoneyDK(m[1]);
+    const lines=getProductLinesDK(t);
+    let sum=0;
+    for(const line of lines){const vals=getMoneyValuesFromLineDK(line);if(vals.length)sum+=vals[vals.length-1];}
+    return sum>0?String(Math.round(sum)):null;
+  }
+
+  function getTotalDK(t){const m=String(t||'').match(/I alt[:\s]+([\d.]+(?:,\d+)?)\s*kr/i);return m?cleanMoneyDK(m[1]):null;}
+  function getDeliveryDK(t){
+    const s=String(t||'');
+    if(/Levering GLS[:\s]+GRATIS|Levering[:\s]+GRATIS/i.test(s))return 'gratis';
+    const m=s.match(/Levering GLS[:\s]+([\d.]+(?:,\d+)?)\s*kr/i)||s.match(/Levering[:\s]+([\d.]+(?:,\d+)?)\s*kr/i);
+    return m?cleanMoneyDK(m[1]):null;
+  }
+  function getProductDK(t){const lines=getProductLinesDK(t);return lines.length?lines.map(l=>l.replace(/^[-—•▪■]\s*/,'').trim()).join(' | '):null;}
+  function getAddressFromBotDK(t){
+    const m=String(t||'').match(/Adresse[:\s]*([\s\S]*?)(?:\n\s*\n|Betalingslink|Vi kontakter|$)/i);
+    if(!m)return null;
+    const addr=m[1].split('\n').map(x=>x.trim()).filter(Boolean).join(', ').replace(/^[,;\s]+|[,;\s]+$/g,'').trim();
+    return addr||null;
+  }
+
+  function getAddressDK(t){
+    const raw=String(t||'').trim();
+    if(!raw||ADDR_EXCLUDE.test(raw))return null;
+    if(/\b\d{4}\b/.test(raw)||/\b(vej|gade|alle|plads|torv|str\.|stræde)\b/i.test(raw)){
+      const without=raw.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,'').replace(/(\+45[\s-]?)?[0-9]{2}[\s-]?[0-9]{2}[\s-]?[0-9]{2}[\s-]?[0-9]{2}/g,'').replace(/^[,;\s]+|[,;\s]+$/g,'').trim();
+      if(!ses.pendingAddressParts.includes(without))ses.pendingAddressParts.push(without);
+      ses.address=ses.pendingAddressParts.join(', ');
+      return ses.address;
+    }
+    const lastBot=hist.filter(m=>m.role==='assistant').slice(-1)[0]?.content||'';
+    if(/adresse|vej|postnummer|by|leveringsoplysninger/i.test(lastBot)&&/\d/.test(raw)){
+      if(!ses.pendingAddressParts.includes(raw))ses.pendingAddressParts.push(raw);
+      ses.address=ses.pendingAddressParts.join(', ');
+      return ses.address;
+    }
+    return null;
+  }
+
+  function getNameDK(t){
+    const raw=String(t||'').trim();
+    if(!raw||ADDR_EXCLUDE.test(raw))return null;
+    const lastBot=hist.filter(m=>m.role==='assistant').slice(-1)[0]?.content||'';
+    if(!/fulde navn|telefon|email|leveringsoplysninger|adresse/i.test(lastBot)&&!getEmail(raw)&&!getPhone(raw))return null;
+    let first=raw.split(',')[0]||'';
+    first=first.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,' ').replace(/(\+45[\s-]?)?[0-9]{2}[\s-]?[0-9]{2}[\s-]?[0-9]{2}[\s-]?[0-9]{2}/g,' ').replace(/\b(vej|gade)\b[\s\S]*$/i,' ').replace(/\b\d{4}\b[\s\S]*$/,' ').replace(/[^A-Za-zÆØÅæøå .'-]/g,' ').replace(/\s+/g,' ').trim();
+    const words=first.split(/\s+/).filter(Boolean).slice(0,3);
+    if(words.length<2||words.some(w=>w.length<2))return null;
+    return words.map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ');
+  }
+
+  function buildSummary(){return hist.filter(m=>m.role==='user').slice(-4).map(m=>m.content.slice(0,80)).join(' | ');}
+  function buildFullChat(){return hist.map(m=>(m.role==='user'?'👤 ':'🤖 ')+m.content).join('\n---\n');}
+
+  function formatProductForTG(){
+    if(!ses.product)return'uafklaret';
+    const lines=ses.product.split('|').map(p=>p.trim()).filter(Boolean);
+    return lines.map(p=>{const isCircle=/rund|⌀/i.test(p);return(isCircle?'⭕':'▪️')+' '+p;}).join('\n');
+  }
+
+  function buildLeadData(extra={}){
+    const utm=getUTM();
+    const pNum=parseFloat(ses.price)||0;
+    let delivery=ses.delivery||(pNum>=1000?'gratis':'67');
+    let total=ses.total;
+    if(!total&&pNum>0)total=String(delivery==='gratis'?pNum:pNum+(parseFloat(delivery)||0));
+    if(total)ses.total=String(total);
+    return{
+      session_id:SID,name:ses.name||'',phone:ses.phone||'',email:ses.email||'',contact:ses.contact||'',
+      product:ses.product||'',product_formatted:formatProductForTG(),
+      price:ses.price||'',delivery,total:ses.total||'',address:ses.address||'',
+      payment_method:ses.paymentMethod||'',stripe_url:ses.stripeUrl||'',
+      summary:buildSummary(),full_chat:buildFullChat(),
+      utm_source:utm.source,utm_medium:utm.medium,utm_campaign:utm.campaign,
+      ...extra,
+    };
+  }
+
+  async function fireLead(extra={}){
+    if(ses.leadFired)return;
+    if(!ses.phone&&!ses.email&&!ses.contact)return;
+    try{
+      const res=await fetch(WORKER_URL+'/lead',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(buildLeadData(extra))});
+      const d=await res.json().catch(()=>({}));
+      if(res.ok&&d.ok!==false)ses.leadFired=true;
+    }catch(e){console.error('[BF] Lead error:',e);}
+  }
+
+  async function fireUpdate(changeType,extra={}){
+    try{await fetch(WORKER_URL+'/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...buildLeadData(),...extra,change_type:changeType})});}
+    catch(e){console.error('[BF] Update error:',e);}
+  }
+
+  function hasContactData(){return!!(ses.phone||ses.email||ses.contact);}
+
+  function clearSessionTimer(){if(ses._saveTimer){clearTimeout(ses._saveTimer);ses._saveTimer=null;}}
+
+  async function saveSessionNow(reason='session'){
+    if(!hist.length)return;
+    try{await fetch(WORKER_URL+'/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(buildLeadData({save_reason:reason,sheet_action:'upsert_by_session_id'}))});ses.sessionSavedOnce=true;}
+    catch(e){console.error('[BF] Session error:',e);}
+  }
+
+  function scheduleSessionSave(reason='idle'){
+    clearSessionTimer();
+    if(hasContactData())return;
+    ses._saveTimer=setTimeout(()=>{if(!hasContactData())saveSessionNow(reason);},60000);
+  }
+
+  function savePostPaymentUpdate(reason='post_payment'){if(!ses.paymentLinkSent)return;saveSessionNow(reason);}
+
+  async function scheduleWarmLead(){
+    if(ses._warmLeadSent||(!ses.email&&!ses.contact)||!ses.price||ses.paymentLinkSent)return;
+    ses._warmLeadSent=true;
+    try{await fetch(WORKER_URL+'/warm-lead',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(buildLeadData({warm_captured_at:Date.now()}))});}
+    catch(e){console.error('[BF] Warm lead error:',e);}
+  }
+
+  async function sendLeadWithStripe(stripeUrl){
+    ses.stripeUrl=stripeUrl;
+    if(ses.leadFired){
+      await fetch(WORKER_URL+'/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(buildLeadData({save_reason:'stripe_url_update',stripe_url:stripeUrl,payment_method:'stripe',sheet_action:'upsert_by_session_id'}))});
+    }else{await fireLead();}
+  }
+
+  async function generateStripe(){
+    try{
+      const lastBot=hist.filter(m=>m.role==='assistant').slice(-1)[0]?.content||'';
+      const pNum=parseFloat(ses.price)||0;
+      const deliveryVal=ses.delivery||getDeliveryDK(lastBot)||(pNum>=1000?'gratis':'67');
+      if(deliveryVal)ses.delivery=deliveryVal;
+      const finalTotal=ses.total||getTotalDK(lastBot)||String(deliveryVal==='gratis'?pNum:pNum+(parseFloat(deliveryVal)||0));
+      ses.total=String(finalTotal);
+      showPaymentLoading(finalTotal);
+      const res=await fetch(WORKER_URL+'/payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(buildLeadData({product:ses.product||'Bordfolie',product_formatted:formatProductForTG(),total:finalTotal,payment_method:'stripe',contact:ses.email||ses.phone||ses.contact||''}))});
+      const d=await res.json();
+      if(d.ok&&d.url){ses.stripeUrl=d.url;ses.stripeSessionId=d.session_id||'';showPayBtn(d.url,finalTotal);await sendLeadWithStripe(d.url);}
+      else{clearPaymentUi();addBot('Problem med betalingslinket. Kontakt os: +48 45 104 05 40');}
+    }catch(e){clearPaymentUi();console.error('[BF] Stripe error:',e);}
+  }
+
+  async function send(quickText){
+    const ta=el('bf-ta');
+    const text=(quickText||ta.value).trim();
+    if(!text||busy)return;
+    if(!quickText){ta.value='';ta.style.height='auto';}
+    busy=true;lock(true);clearSessionTimer();
+    addUser(text);showTyping();
+
+    if(/telefonisk.*ordre|ring.*til|kalder|opkald|bestille.*telefon/i.test(text))ses.phoneRequest=true;
+    if(/kontant.*levering|ved levering|kontant/i.test(text))ses.paymentMethod='cod';
+    if(/online|mobilepay|kort|betal.*online/i.test(text))ses.paymentMethod='stripe';
+
+    if(ses.paymentLinkSent&&ses.paymentMethod!=='cod'&&/levering|kontant|skift/i.test(text)){
+      ses.paymentMethod='cod';
+      const pNum=parseFloat(ses.price)||0;
+      const deliveryVal=ses.delivery||(pNum>=1000?'gratis':'67');
+      const total=ses.total||String(deliveryVal==='gratis'?pNum:pNum+(parseFloat(deliveryVal)||0));
+      ses.delivery=deliveryVal;ses.total=String(total);
+      showCOD(total);
+      if(ses.leadFired)await fireUpdate('payment_changed_to_cod',{payment_method:'cod',total});
+      else await fireLead();
+      savePostPaymentUpdate('payment_changed_to_cod');
+      busy=false;lock(false);el('bf-ta').focus();return;
+    }
+
+    const phone=getPhone(text),email=getEmail(text),name=getNameDK(text),addr=getAddressDK(text);
+    if(phone&&!ses.phone)ses.phone=phone;
+    if(email&&!ses.email)ses.email=email;
+    if(name&&!ses.name)ses.name=name;
+    if(addr)ses.address=addr;
+    if((phone||email)&&!ses.contact)ses.contact=phone||email;
+
+    hist.push({role:'user',content:text});
+
+    if(!hasContactData())scheduleSessionSave('idle_no_contact');
+    else if(ses.paymentLinkSent)savePostPaymentUpdate('post_payment_user_msg');
+
+    try{
+      const res=await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist})});
+      const data=await res.json();
+      const reply=data.content?.[0]?.text||'Beklager, prøv igen.';
+      hist.push({role:'assistant',content:reply});
+
+      const price=getPriceDK(reply),totalP=getTotalDK(reply),deliveryP=getDeliveryDK(reply),product=getProductDK(reply),addrBot=getAddressFromBotDK(reply);
+      if(price)ses.price=price;
+      if(totalP)ses.total=totalP;
+      if(deliveryP)ses.delivery=deliveryP;
+      if(product)ses.product=product;
+      if(addrBot)ses.address=addrBot;
+      if(/kontant.*levering|betaling.*levering/i.test(reply))ses.paymentMethod='cod';
+      if(/betalingslink.*vises|mobilepay.*kort|online.*kort/i.test(reply)&&ses.paymentMethod!=='cod')ses.paymentMethod='stripe';
+
+      addBot(reply);addTime();detectQR(reply);
+
+      if(ses.email&&ses.price&&!ses.paymentLinkSent&&!ses._warmLeadSent)scheduleWarmLead();
+      if(!hasContactData())scheduleSessionSave('idle_no_contact_bot');
+      else if(ses.paymentLinkSent)savePostPaymentUpdate('post_payment_bot_reply');
+
+      const isConfirm=/bestillingen er modtaget|betalingslink vises|i alt.*kr/i.test(reply);
+      if(isConfirm&&(ses.phone||ses.email)&&!ses.paymentLinkSent){
+        ses.paymentLinkSent=true;
+        if(ses.paymentMethod==='cod'){
+          const pNum=parseFloat(ses.price)||0;
+          const deliveryVal=ses.delivery||(pNum>=1000?'gratis':'67');
+          const total=ses.total||String(deliveryVal==='gratis'?pNum:pNum+(parseFloat(deliveryVal)||0));
+          ses.delivery=deliveryVal;ses.total=String(total);
+          showCOD(total);fireLead();
+        }else{generateStripe();}
+      }
+    }catch(e){
+      el('bf-log').querySelector('.bf-typing')?.remove();
+      addBot('Ingen forbindelse. Prøv at genindlæse siden.');
+      if(!hasContactData())scheduleSessionSave('idle_error');
+    }finally{busy=false;lock(false);el('bf-ta').focus();}
+  }
+
+  function autoOpen(){
+    if(sessionStorage.getItem('bf_auto_done')||sessionStorage.getItem('bf_auto_block'))return;
+    setTimeout(()=>{if(!open&&!sessionStorage.getItem('bf_auto_block')){const t=el('bf-tooltip');if(t)t.style.display='block';}},5000);
+    setTimeout(()=>{if(!open&&!sessionStorage.getItem('bf_auto_block')){sessionStorage.setItem('bf_auto_done','1');openChat();}},30000);
+  }
+
+  function init(){
+    build();
+    el('bf-btn').addEventListener('click',()=>{sessionStorage.setItem('bf_auto_block','1');open?closeChat():openChat();});
+    el('bf-x').addEventListener('click',closeChat);
+    el('bf-go').addEventListener('click',()=>send());
+    el('bf-tooltip').addEventListener('click',()=>{sessionStorage.setItem('bf_auto_block','1');openChat();});
+    el('bf-ta').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+    el('bf-ta').addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px';});
+    autoOpen();
+  }
+
+  document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
+})();
