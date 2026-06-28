@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.info('[Bordfolie DK widget V19 buttons fixed loaded]');
+  console.info('[Bordfolie DK widget V20 Polish-logic loaded]');
 
   const WORKER_URL = 'https://bordfolie-dk.metsukisutemi.workers.dev';
   const ASSISTANT_AVATAR_URL = 'https://static.tildacdn.com/stor3530-6335-4030-b366-363966383437/5efb2fc2ea144f1ae0d2f12885474f78.jpg';
@@ -163,7 +163,22 @@
       btn.className='bf-qbtn';btn.textContent=label;
       btn.onclick=()=>{
         if(label.includes('Indsæt skabelon')){insertDeliveryTemplate();return;}
-        send(label);
+        if(label==='Ved ikke / hjælp mig') return send('Jeg ved ikke, hvilken type bordplade jeg har. Hjælp mig med at vælge den rigtige variant.');
+        if(label==='Anbefal en variant') return send('Anbefal venligst den bedste variant.');
+        if(label==='Vis forskellen') return send('Hvad er forskellen på 1,5mm og 2mm?');
+        if(label==='Jeg kender ikke målet') return send('Jeg kender ikke det præcise mål. Forklar gerne, hvordan jeg måler bordpladen.');
+        if(label==='Jeg har flere mål') return send('Jeg har flere mål, som skal beregnes.');
+        if(label==='Hvilken skal jeg vælge?') return send('Hvilken betalingsmulighed skal jeg vælge?');
+        if(label==='Beregn pris') return send('Jeg vil gerne beregne en pris.');
+        if(label==='Forskel 1,5mm / 2mm') return send('Hvad er forskellen på 1,5mm og 2mm?');
+        if(label==='Levering og tid') return send('Hvad koster levering, og hvor lang er leveringstiden?');
+        if(label==='Retur / reklamation') return send('Hvordan fungerer retur eller reklamation?');
+        if(label==='Flytter den sig?') return send('Flytter bordfolien sig på bordpladen?');
+        if(label==='Pleje') return send('Hvordan rengør jeg bordfolien?');
+        if(label==='Kontakt rådgiver') return send('Jeg vil gerne have kontakt med en rådgiver.');
+        if(label==='Jeg har en almindelig rektangel') return send('Jeg har en almindelig rektangulær bordplade.');
+        if(label==='Ret / tilføj mål') return send('Jeg vil gerne rette eller tilføje mål til ordren.');
+        return send(label);
       };
       qr.appendChild(btn);
     });
@@ -174,43 +189,88 @@
 
   function detectQR(botText){
     if(ses.paymentLinkSent)return;
-    const t=String(botText||'').toLowerCase();
+    const raw=String(botText||'');
+    const t=raw.toLowerCase();
 
-    const asksDelivery=/udfyld venligst|fulde navn:|telefon:|email:|vej og husnummer|postnummer:|leveringsoplysninger/i.test(botText);
+    // 1) Leveringsdata — kun efter bekræftet ordre. Ingen telefon-knap her.
+    const asksDelivery=/kopi[ée]r og udfyld|udfyld venligst|leveringsoplysninger|fulde navn:|navn:|telefon:|e-mail:|email:|vej og husnummer|gade og husnummer|postnummer:|mangler stadig/i.test(raw);
     if(asksDelivery){
       ses.deliveryDataRequested=true;ses.orderConfirmed=true;
       setQR(['📋 Indsæt skabelon','Spørgsmål før data','Ret / tilføj mål']);
       return;
     }
 
-    const isSummary=/ordreoversigt|bekræfter du bestillingen|bekraefter du bestillingen/i.test(botText)&&/i alt|levering gls|bordfolie i alt/i.test(botText);
+    // 2) Ordreoversigt / bekræftelse — betaling må IKKE vises her.
+    const isSummary=(/ordreoversigt|bekræfter du ordren|bekræfter du bestillingen|bekraefter du ordren|bekraefter du bestillingen/i.test(raw))&&(/bordfolie i alt|gls levering|i alt/i.test(raw));
     if(isSummary&&!ses.deliveryDataRequested){
       ses.hasSummary=true;
       setQR(['Ja, jeg bekræfter','Tilføj et mål','Ret mål','Spørgsmål om levering']);
       return;
     }
 
-    const asksPayment=/betalingslink vises|mobilepay|kort via stripe|betal online|sikker betaling/i.test(botText)&&ses.deliveryDataRequested&&hasFullDeliveryData();
+    // 3) Betaling — først efter komplette leveringsdata. DK har kun onlinebetaling.
+    const asksPayment=(/vil du betale online|betale online|mobilepay\/kort|mobilepay eller kort|kort via stripe|betalingslinket vises|betalingslink vises/i.test(raw))&&ses.deliveryDataRequested&&hasFullDeliveryData();
     if(asksPayment){
       ses.paymentStep=true;
       setQR(['💳 MobilePay / kort','Hvilken skal jeg vælge?']);
       return;
     }
 
-    if(/slags bordplade|hvilken.*bordplade|mat træ|glas.*lak/i.test(t)){
-      setQR(['Mat træ','Glas / lak / blank','Laminat','Jeg har et spørgsmål']);
-    }else if(/1,5mm.*2mm|2mm.*1,5mm|hvilken tykkelse|tykkelse ønsker du|hvilken tykkelse ønsker/i.test(t)&&!ses.price){
-      setQR(['1,5mm — billigere','2mm — mere holdbar','Hvilken skal jeg vælge?']);
-    }else if(/intensiv.*brug|køkken.*børn|daglig.*brug|lettere.*brug|sjæld/i.test(t)&&!ses.price){
+    // 4) Tykkelse — SKAL komme før intensitet, fordi svaret kan indeholde "daglig brug".
+    const asksThickness=(/hvilken tykkelse|tykkelse ønsker du|vælger du 1,5mm|vælger du 2mm|1,5mm.*2mm|2mm.*1,5mm/i.test(raw))&&!/mål i cm|angiv.*mål|skriv målene|ordreoversigt/i.test(raw)&&!ses.price;
+    if(asksThickness){
+      setQR(['1,5mm — billigere','2mm — mere holdbar','Anbefal en variant','Vis forskellen','Tilbud -50%']);
+      return;
+    }
+
+    // 5) Type bordplade — kun når botten faktisk spørger om overfladetype.
+    const asksSurface=/hvilken slags bordplade|hvilken type bordplade|hvilken bordplade har du|type bordplade/i.test(raw)||(/mat træ/i.test(raw)&&/laminat/i.test(raw)&&/glas/i.test(raw));
+    if(asksSurface){
+      setQR(['Mat træ','Glas / lak / blank','Laminat','Ved ikke / hjælp mig','Jeg har et spørgsmål']);
+      return;
+    }
+
+    // 6) Intensitet / brug — kun hvis det er et spørgsmål om brug, ikke når der spørges om tykkelse.
+    const asksUsage=(/er det køkken|daglig brug eller|kontor\/stue|mere kontor|bruges intensivt|let beskyttelse|hvor meget bruges/i.test(raw))&&!asksThickness&&!ses.price;
+    if(asksUsage){
       setQR(['Køkken / daglig brug','Spisebord / børn','Stue / sjældnere','Skrivebord','Terrasse / have','Ved ikke']);
-    }else if(/mål i cm|angiv.*mål|bordmål/i.test(t)&&!ses.price){
-      setQR(['80×60 cm','100×80 cm','120×80 cm','140×80 cm','160×90 cm','Andre mål']);
-    }else if(/rundt.*bord|firkantet|kvadratisk/i.test(t)){
-      setQR(['Rundt bord','Firkantet','Ved ikke']);
-    }else if(/andre borde|flere borde/i.test(t)){
-      setQR(['Ja, jeg har flere','Nej, det er alt']);
-    }else if(/spørgsmål|hjælpe|hjælp/i.test(t)&&!ses.hasSummary){
-      setQR(['Beregn pris','Levering','Materiale','Pleje']);
+      return;
+    }
+
+    // 7) Mål.
+    const asksSize=(/mål i cm|skriv målene|angiv.*mål|bordmål|længde|bredde/i.test(raw))&&!ses.price;
+    if(asksSize){
+      setQR(['80×60 cm','90×60 cm','100×80 cm','120×80 cm','120×100 cm','140×80 cm','160×90 cm','Jeg har flere mål','Jeg kender ikke målet']);
+      return;
+    }
+
+    // 8) Rund / kvadratisk form for kvadratiske mål.
+    if((/rundt bord|rund eller kvadratisk|kvadratisk|firkantet/i.test(raw))&&!/ordreoversigt/i.test(raw)){
+      setQR(['Rundt bord','Kvadratisk','Ved ikke','Anden form']);
+      return;
+    }
+
+    // 9) Flere borde.
+    if(/andre borde|flere borde|flere mål|er det alt/i.test(raw)){
+      setQR(['Ja, jeg har flere','Nej, det er alt','Jeg har flere mål']);
+      return;
+    }
+
+    // 10) Tilbud.
+    if(/tilbud|udsalg|-50%|halv pris/i.test(raw)){
+      setQR(['Ja, tilbud -50%','Nej, standard','Vis standardpris']);
+      return;
+    }
+
+    // 11) Ikke-standard form.
+    if(/foto eller tegning|billede eller tegning|specialform|afrundede hjørner|anden form/i.test(raw)){
+      setQR(['Jeg sender på e-mail','Kontakt rådgiver','Jeg har en almindelig rektangel']);
+      return;
+    }
+
+    // 12) FAQ / hjælp.
+    if(/spørgsmål|hjælpe|hjælp|hvad kan/i.test(raw)&&!ses.hasSummary){
+      setQR(['Beregn pris','Forskel 1,5mm / 2mm','Flytter den sig?','Levering og tid','Retur / reklamation','Pleje']);
     }
   }
 
@@ -252,7 +312,7 @@
       started=true;showTyping();
       await new Promise(r=>setTimeout(r,600));
       el('bf-log').querySelector('.bf-typing')?.remove();
-      const _firstMsg = 'Hej! 👋 Her er Sara fra bordfolie.com.\n\nJeg beregner prisen på din bordfolie på under et minut — også om aftenen og i weekenden.\n\nHvilken slags bordplade har du?';
+      const _firstMsg = 'Hej! 👋 Her er Sara fra bordfolie.com.\n\nJeg hjælper med at vælge variant og beregner prisen på bordfolie til din bordplade på under et minut — også om aftenen og i weekenden.\n\nHvilken slags bordplade har du?';
       addBot(_firstMsg);
       hist.push({role:'assistant', content:_firstMsg});
       addTime();
