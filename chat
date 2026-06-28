@@ -1,8 +1,9 @@
-// Bordfolie.com DK — Chat Widget (dansk)
+// Bordfolie.com DK — Chat Widget V5 (Sara photo, 24/7, stage buttons)
 (function () {
   'use strict';
 
-  const WORKER_URL = 'https://bordfolie-dk.metsukisutemi.workers.dev/';
+  const WORKER_URL = 'https://bordfolie-dk.metsukisutemi.workers.dev';
+  const ASSISTANT_AVATAR_URL = 'https://static.tildacdn.com/stor3530-6335-4030-b366-363966383437/5efb2fc2ea144f1ae0d2f12885474f78.jpg';
 
   function getUTM() {
     return {
@@ -29,10 +30,12 @@
     #bf-box{position:absolute;bottom:70px;right:0;width:340px;background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);display:flex;flex-direction:column;overflow:hidden;max-height:calc(100vh - 120px);transition:opacity .2s,transform .2s;transform-origin:bottom right;}
     #bf-box.hidden{opacity:0;transform:scale(.95) translateY(8px);pointer-events:none;}
     #bf-hd{background:#1c3d2e;padding:14px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
-    .bf-hav{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0;}
+    .bf-hav{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0;overflow:hidden;border:2px solid rgba(255,255,255,.18);}
+    .bf-hav img{width:100%;height:100%;object-fit:cover;display:block;}
+    .bf-badge247{display:inline-flex;align-items:center;justify-content:center;margin-left:7px;padding:2px 8px;border-radius:999px;background:rgba(104,211,145,.22);color:#d8ffe4;font-size:12px;font-weight:800;vertical-align:middle;}
     .bf-htxt{flex:1;min-width:0;}
-    .bf-hname{color:#fff;font-size:14px;font-weight:600;}
-    .bf-hsub{color:rgba(255,255,255,.6);font-size:11px;margin-top:2px;display:flex;align-items:center;gap:5px;}
+    .bf-hname{color:#fff;font-size:16px;font-weight:700;line-height:1.15;}
+    .bf-hsub{color:rgba(255,255,255,.72);font-size:12px;margin-top:4px;display:flex;align-items:center;gap:5px;}
     .bf-online{width:6px;height:6px;background:#68d391;border-radius:50%;animation:bf-op 2s infinite;}
     @keyframes bf-op{0%,100%{opacity:1}50%{opacity:.4}}
     #bf-x{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.5);font-size:18px;line-height:1;padding:2px 4px;transition:color .15s;flex-shrink:0;}
@@ -44,7 +47,8 @@
     #bf-log::-webkit-scrollbar{width:3px;}
     #bf-log::-webkit-scrollbar-thumb{background:#d0c8bc;border-radius:2px;}
     .bf-row{display:flex;align-items:flex-end;gap:7px;}.bf-row.u{flex-direction:row-reverse;}
-    .bf-ava{width:26px;height:26px;border-radius:50%;background:#1c3d2e;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;}
+    .bf-ava{width:30px;height:30px;border-radius:50%;background:#1c3d2e;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;overflow:hidden;border:1px solid rgba(28,61,46,.12);}
+    .bf-ava img{width:100%;height:100%;object-fit:cover;display:block;}
     .bf-bubble{max-width:78%;padding:9px 13px;font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap;border-radius:14px;}
     .bf-row.b .bf-bubble{background:#fff;color:#1a1a1a;border-bottom-left-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
     .bf-row.u .bf-bubble{background:#1c3d2e;color:#fff;border-bottom-right-radius:3px;}
@@ -83,6 +87,7 @@
     name:null,phone:null,email:null,contact:null,circleSize:null,
     price:null,product:null,address:null,paymentMethod:null,total:null,delivery:null,stripeUrl:null,
     leadFired:false,phoneRequest:false,paymentLinkSent:false,
+    hasSummary:false,orderConfirmed:false,deliveryDataRequested:false,paymentStep:false,
     pendingAddressParts:[],sessionSavedOnce:false,_saveTimer:null,_warmLeadSent:false,
   };
 
@@ -92,18 +97,18 @@
     r.innerHTML=`
       <div id="bf-box" class="hidden">
         <div id="bf-hd">
-          <div class="bf-hav">S</div>
+          <div class="bf-hav"><img src="${ASSISTANT_AVATAR_URL}" alt="Sara"></div>
           <div class="bf-htxt">
-            <div class="bf-hname">Sara — Salgsrådgiver</div>
-            <div class="bf-hsub"><span class="bf-online"></span>bordfolie.com</div>
+            <div class="bf-hname">Sara — rådgiver online <span class="bf-badge247">24/7</span></div>
+            <div class="bf-hsub"><span class="bf-online"></span>tilgængelig 24/7 · bordfolie.com</div>
           </div>
           <button id="bf-x">✕</button>
         </div>
         <div id="bf-sid">Bestillings-ID: ${SID}</div>
         <div id="bf-trust">
-          <span class="bf-ti">✓ 100.000+ ordrer</span>
+          <span class="bf-ti">✓ Chat 24/7</span>
+          <span class="bf-ti">✓ Pris med det samme</span>
           <span class="bf-ti">✓ Sikker betaling</span>
-          <span class="bf-ti">✓ Tilskåret på mål</span>
         </div>
         <div id="bf-log" role="log" aria-live="polite"></div>
         <div id="bf-qr"></div>
@@ -113,9 +118,9 @@
             <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>
-        <div id="bf-pw">bordfolie.com</div>
+        <div id="bf-pw">chat 24/7 · bordfolie.com</div>
       </div>
-      <div id="bf-tooltip">Beregn prisen på din bordfolie på 30 sek. 👋</div>
+      <div id="bf-tooltip">Chat 24/7 — jeg beregner prisen på 30 sek. 👋</div>
       <button id="bf-btn">
         <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       </button>
@@ -129,7 +134,7 @@
   function addBot(text){
     el('bf-log').querySelector('.bf-typing')?.remove();
     const row=document.createElement('div');row.className='bf-row b';
-    row.innerHTML=`<div class="bf-ava">S</div><div class="bf-bubble">${text.replace(/\n/g,'<br>')}</div>`;
+    row.innerHTML=`<div class="bf-ava"><img src="${ASSISTANT_AVATAR_URL}" alt="Sara"></div><div class="bf-bubble">${text.replace(/\n/g,'<br>')}</div>`;
     el('bf-log').appendChild(row);scroll();
   }
   function addUser(text){
@@ -139,33 +144,73 @@
   }
   function showTyping(){
     const row=document.createElement('div');row.className='bf-row b bf-typing';
-    row.innerHTML=`<div class="bf-ava">S</div><div class="bf-bubble"><span class="bf-dots"><span></span><span></span><span></span></span></div>`;
+    row.innerHTML=`<div class="bf-ava"><img src="${ASSISTANT_AVATAR_URL}" alt="Sara"></div><div class="bf-bubble"><span class="bf-dots"><span></span><span></span><span></span></span></div>`;
     el('bf-log').appendChild(row);scroll();
   }
   function lock(v){el('bf-ta').disabled=v;el('bf-go').disabled=v;}
-  function setQR(buttons){const qr=el('bf-qr');qr.innerHTML='';buttons.forEach(label=>{const btn=document.createElement('button');btn.className='bf-qbtn';btn.textContent=label;btn.onclick=()=>send(label);qr.appendChild(btn);});}
+  function insertDeliveryTemplate(){
+    const ta=el('bf-ta');
+    ta.value=`Fulde navn:\nTelefon:\nEmail:\nVej og husnummer:\nPostnummer:\nBy:`;
+    ta.focus();
+    ta.style.height='auto';
+    ta.style.height=Math.min(ta.scrollHeight,80)+'px';
+  }
+
+  function setQR(buttons){
+    const qr=el('bf-qr');qr.innerHTML='';
+    buttons.forEach(label=>{
+      const btn=document.createElement('button');
+      btn.className='bf-qbtn';btn.textContent=label;
+      btn.onclick=()=>{
+        if(label.includes('Indsæt skabelon')){insertDeliveryTemplate();return;}
+        send(label);
+      };
+      qr.appendChild(btn);
+    });
+  }
   function clearQR(){el('bf-qr').innerHTML='';}
 
+  function hasFullDeliveryData(){return Boolean((ses.phone||ses.contact)&&ses.email&&ses.address);}
+
   function detectQR(botText){
-    const questionCount=(botText.match(/[?]/g)||[]).length;
-    if(questionCount>1)return;
     if(ses.paymentLinkSent)return;
-    if(/bestillingen er modtaget/i.test(botText))return;
-    const t=botText.toLowerCase();
+    const t=String(botText||'').toLowerCase();
+
+    const asksDelivery=/udfyld venligst|fulde navn:|telefon:|email:|vej og husnummer|postnummer:|leveringsoplysninger/i.test(botText);
+    if(asksDelivery){
+      ses.deliveryDataRequested=true;ses.orderConfirmed=true;
+      setQR(['📋 Indsæt skabelon','Spørgsmål før data','Ret / tilføj mål']);
+      return;
+    }
+
+    const isSummary=/ordreoversigt|bekræfter du bestillingen|bekraefter du bestillingen/i.test(botText)&&/i alt|levering gls|bordfolie i alt/i.test(botText);
+    if(isSummary&&!ses.deliveryDataRequested){
+      ses.hasSummary=true;
+      setQR(['Ja, jeg bekræfter','Tilføj et mål','Ret mål','Spørgsmål om levering']);
+      return;
+    }
+
+    const asksPayment=/betalingslink vises|mobilepay|kort via stripe|betal online|sikker betaling/i.test(botText)&&ses.deliveryDataRequested&&hasFullDeliveryData();
+    if(asksPayment){
+      ses.paymentStep=true;
+      setQR(['💳 MobilePay / kort','Hvilken skal jeg vælge?']);
+      return;
+    }
+
     if(/slags bordplade|hvilken.*bordplade|mat træ|glas.*lak/i.test(t)){
-      setQR(['Mat træ','Glas / lak / blank','Laminat']);
-    }else if(/intensiv.*brug|køkken.*barn|lettere.*brug|sjæld/i.test(t)&&!ses.price){
-      setQR(['Intensiv brug (køkken/børn)','Lettere brug (skrivebord/stue)']);
-    }else if(/1,5mm.*2mm|2mm.*1,5mm/i.test(t)&&!ses.price){
-      setQR(['1,5mm — billigere','2mm — mere holdbar']);
+      setQR(['Mat træ','Glas / lak / blank','Laminat','Jeg har et spørgsmål']);
+    }else if(/intensiv.*brug|køkken.*børn|daglig.*brug|lettere.*brug|sjæld/i.test(t)&&!ses.price){
+      setQR(['Køkken / daglig brug','Spisebord / børn','Stue / sjældnere','Skrivebord','Terrasse / have','Ved ikke']);
+    }else if(/1,5mm.*2mm|2mm.*1,5mm|hvilken tykkelse/i.test(t)&&!ses.price){
+      setQR(['1,5mm — billigere','2mm — mere holdbar','Hvilken skal jeg vælge?']);
     }else if(/mål i cm|angiv.*mål|bordmål/i.test(t)&&!ses.price){
       setQR(['80×60 cm','100×80 cm','120×80 cm','140×80 cm','160×90 cm','Andre mål']);
-    }else if(/rundt.*bord|firkantet|okrągły/i.test(t)){
-      setQR(['Ja, rundt bord','Nej, firkantet']);
+    }else if(/rundt.*bord|firkantet|kvadratisk/i.test(t)){
+      setQR(['Rundt bord','Firkantet','Ved ikke']);
     }else if(/andre borde|flere borde/i.test(t)){
       setQR(['Ja, jeg har flere','Nej, det er alt']);
-    }else if(/mobilepay.*kort|kontant.*levering|hvordan.*betale/i.test(t)){
-      setQR(['💳 Online (MobilePay/kort)','🚚 Kontant ved levering']);
+    }else if(/spørgsmål|hjælpe|hjælp/i.test(t)&&!ses.hasSummary){
+      setQR(['Beregn pris','Levering','Materiale','Pleje']);
     }
   }
 
@@ -193,24 +238,12 @@
         '</a>'+
       '</div>'+
       '<div class="bf-pay-note">Betalingen sker via Stripe — MobilePay eller kort.</div>'+
-      '<div style="font-size:11px;color:#9ca3af;text-align:center;cursor:pointer;margin-top:8px;" onclick="window.__bfChangeToCOD&&window.__bfChangeToCOD('+total+')">'+
-        'Skift til kontant ved levering →'+
-      '</div>';
+      '';
     el('bf-log').appendChild(w);scroll();
-    window.__bfChangeToCOD=function(t){
-      ses.paymentMethod='cod';clearPaymentUi();clearQR();showCOD(t);
-      fireUpdate('payment_changed_to_cod',{payment_method:'cod',total:t});
-      savePostPaymentUpdate('payment_changed_to_cod_button');
-    };
+    // COD not available in DK
   }
 
-  function showCOD(total){
-    clearQR();
-    const sidEl=el('bf-sid');if(sidEl)sidEl.textContent='Bestillings-ID: '+SID;
-    const d=document.createElement('div');d.className='bf-cod-box';
-    d.innerHTML='✅ Bestilling modtaget!<br>ID: <strong>'+SID+'</strong><br>Betaling ved levering: <strong>'+total+' kr</strong><br>Vi kontakter dig snarest.';
-    el('bf-log').appendChild(d);scroll();
-  }
+  function showCOD(total){ /* COD not available in DK */ }
 
   async function openChat(){
     open=true;el('bf-box').classList.remove('hidden');
@@ -219,7 +252,9 @@
       started=true;showTyping();
       await new Promise(r=>setTimeout(r,600));
       el('bf-log').querySelector('.bf-typing')?.remove();
-      addBot('Hej! 👋 Jeg er Sara fra bordfolie.com.\n\nJeg beregner prisen på din bordfolie på under et minut.\n\nHvilken slags bordplade har du?');
+      const _firstMsg = 'Hej! 👋 Her er Sara fra bordfolie.com.\n\nJeg beregner prisen på din bordfolie på under et minut — også om aftenen og i weekenden.\n\nHvilken slags bordplade har du?';
+      addBot(_firstMsg);
+      hist.push({role:'assistant', content:_firstMsg});
       addTime();
       setQR(['Mat træ','Glas / lak / blank','Laminat','Jeg har et spørgsmål']);
     }
@@ -236,27 +271,41 @@
   function getPhone(t){const m=String(t||'').match(/(?:\+45[\s-]?)?[0-9]{2}[\s-]?[0-9]{2}[\s-]?[0-9]{2}[\s-]?[0-9]{2}/);return m?m[0].replace(/[\s-]/g,''):null;}
   function getEmail(t){const m=t.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);return m?m[0]:null;}
 
-  const ADDR_EXCLUDE=/^Mat træ$|^Glas \/ lak \/ blank$|^Laminat$|^Intensiv brug.*$|^Lettere brug.*$|^1,5mm.*$|^2mm.*$|^Ja, rundt bord$|^Nej, firkantet$|^Ja, jeg har flere$|^Nej, det er alt$|^(?:💳\s*)?Online.*$|^(?:🚚\s*)?Kontant.*$|^\d{2,3}[×x]\d{2,3}\s*cm$|^Andre mål$|^Jeg har et spørgsmål$/i;
+  const ADDR_EXCLUDE=/^Mat træ$|^Glas \/ lak \/ blank$|^Laminat$|^Køkken \/ daglig brug$|^Spisebord \/ børn$|^Stue \/ sjældnere$|^Skrivebord$|^Terrasse \/ have$|^Ved ikke$|^Intensiv brug.*$|^Lettere brug.*$|^1,5mm.*$|^2mm.*$|^Hvilken skal jeg vælge\?$|^Rundt bord$|^Firkantet$|^Ja, rundt bord$|^Nej, firkantet$|^Ja, jeg har flere$|^Nej, det er alt$|^Ja, jeg bekræfter$|^Tilføj et mål$|^Ret mål$|^Spørgsmål om levering$|^📋 Indsæt skabelon$|^Spørgsmål før data$|^Ret \/ tilføj mål$|^(?:💳\s*)?MobilePay.*$|^(?:💳\s*)?Betal online.*$|^\d{2,3}[×x]\d{2,3}\s*cm$|^Andre mål$|^Jeg har et spørgsmål$|^Beregn pris$|^Levering$|^Materiale$|^Pleje$/i;
 
   function cleanMoneyDK(v){return String(v||'').replace(/\./g,'').replace(',','.');}
   function getMoneyValuesFromLineDK(line){return[...String(line||'').matchAll(/([\d.]+(?:,\d+)?)\s*kr/gi)].map(m=>parseFloat(cleanMoneyDK(m[1]))).filter(n=>Number.isFinite(n));}
 
   function isProductLineDK(line){
     const l=String(line||'').trim();
-    if(!/^[-—•▪■]/.test(l))return false;
-    if(/levering|i alt|samlet|adresse|link|betaling/i.test(l))return false;
-    return /\d{2,4}\s*[xX×]\s*\d{2,4}|rund|rektangel|kvadrat|riflet|glat|klar|udsalg|cm|mm/i.test(l)&&/kr/i.test(l);
+    // Accept any dash/bullet variant (em-dash, en-dash, hyphen, bullets)
+    if(!/^[-–—•▪■]/.test(l))return false;
+    if(/levering|i alt|samlet|adresse|link|betaling|gratis/i.test(l))return false;
+    // Must have price in kr AND either dimensions or product type
+    if(!/kr/i.test(l))return false;
+    return /\d{2,4}\s*[xX×Ø✕]\s*\d{2,4}|rund|rektangel|kvadrat|riflet|glat|klar|udsalg|\bcm\b|\bmm\b/i.test(l);
   }
 
   function getProductLinesDK(t){return String(t||'').split('\n').map(l=>l.trim()).filter(isProductLineDK);}
 
   function getPriceDK(t){
-    let m=String(t||'').match(/Bordfolie i alt[:\s]+([\d.]+(?:,\d+)?)\s*kr/i);if(m)return cleanMoneyDK(m[1]);
-    m=String(t||'').match(/Folie i alt[:\s]+([\d.]+(?:,\d+)?)\s*kr/i);if(m)return cleanMoneyDK(m[1]);
+    const s=String(t||'');
+    // Спочатку шукаємо явний підсумок по фолії
+    let m=s.match(/Bordfolie i alt[:\s]*([\d.]+(?:,\d+)?)\s*kr/i);if(m)return cleanMoneyDK(m[1]);
+    m=s.match(/Folie i alt[:\s]*([\d.]+(?:,\d+)?)\s*kr/i);if(m)return cleanMoneyDK(m[1]);
+    // Якщо є рядки з товарами — сумуємо
     const lines=getProductLinesDK(t);
     let sum=0;
     for(const line of lines){const vals=getMoneyValuesFromLineDK(line);if(vals.length)sum+=vals[vals.length-1];}
-    return sum>0?String(Math.round(sum)):null;
+    if(sum>0)return String(Math.round(sum));
+    // Fallback: I alt мінус доставка
+    const totalM=s.match(/I alt[:\s]*([\d.]+(?:,\d+)?)\s*kr/i);
+    const delivM=s.match(/Levering GLS[:\s]*([\d.]+(?:,\d+)?)\s*kr/i);
+    if(totalM&&delivM){
+      const t2=parseFloat(cleanMoneyDK(totalM[1])),d=parseFloat(cleanMoneyDK(delivM[1]));
+      if(Number.isFinite(t2)&&Number.isFinite(d)&&t2>d)return String(Math.round(t2-d));
+    }
+    return null;
   }
 
   function getTotalDK(t){const m=String(t||'').match(/I alt[:\s]+([\d.]+(?:,\d+)?)\s*kr/i);return m?cleanMoneyDK(m[1]):null;}
@@ -308,9 +357,14 @@
   function buildFullChat(){return hist.map(m=>(m.role==='user'?'👤 ':'🤖 ')+m.content).join('\n---\n');}
 
   function formatProductForTG(){
-    if(!ses.product)return'uafklaret';
+    if(!ses.product){
+      // Fallback: якщо продукт невідомий але є ціна — показуємо ціну
+      const price=ses.price?ses.price+' kr':'?';
+      const total=ses.total?ses.total+' kr':'?';
+      return 'Bordfolie (uafklaret format) — folie: '+price+', i alt: '+total;
+    }
     const lines=ses.product.split('|').map(p=>p.trim()).filter(Boolean);
-    return lines.map(p=>{const isCircle=/rund|⌀/i.test(p);return(isCircle?'⭕':'▪️')+' '+p;}).join('\n');
+    return lines.map(p=>{const isCircle=/rund|⏀|⬤|⚪/i.test(p);return(isCircle?'⭕':'▪️')+' '+p;}).join('\n');
   }
 
   function buildLeadData(extra={}){
@@ -403,21 +457,10 @@
     addUser(text);showTyping();
 
     if(/telefonisk.*ordre|ring.*til|kalder|opkald|bestille.*telefon/i.test(text))ses.phoneRequest=true;
-    if(/kontant.*levering|ved levering|kontant/i.test(text))ses.paymentMethod='cod';
-    if(/online|mobilepay|kort|betal.*online/i.test(text))ses.paymentMethod='stripe';
+    // COD not available in DK
+    if(/online|mobilepay|kort|betal.*online|mobilepay \/ kort/i.test(text))ses.paymentMethod='stripe';
 
-    if(ses.paymentLinkSent&&ses.paymentMethod!=='cod'&&/levering|kontant|skift/i.test(text)){
-      ses.paymentMethod='cod';
-      const pNum=parseFloat(ses.price)||0;
-      const deliveryVal=ses.delivery||(pNum>=1000?'gratis':'67');
-      const total=ses.total||String(deliveryVal==='gratis'?pNum:pNum+(parseFloat(deliveryVal)||0));
-      ses.delivery=deliveryVal;ses.total=String(total);
-      showCOD(total);
-      if(ses.leadFired)await fireUpdate('payment_changed_to_cod',{payment_method:'cod',total});
-      else await fireLead();
-      savePostPaymentUpdate('payment_changed_to_cod');
-      busy=false;lock(false);el('bf-ta').focus();return;
-    }
+    // COD not available in DK
 
     const phone=getPhone(text),email=getEmail(text),name=getNameDK(text),addr=getAddressDK(text);
     if(phone&&!ses.phone)ses.phone=phone;
@@ -443,8 +486,8 @@
       if(deliveryP)ses.delivery=deliveryP;
       if(product)ses.product=product;
       if(addrBot)ses.address=addrBot;
-      if(/kontant.*levering|betaling.*levering/i.test(reply))ses.paymentMethod='cod';
-      if(/betalingslink.*vises|mobilepay.*kort|online.*kort/i.test(reply)&&ses.paymentMethod!=='cod')ses.paymentMethod='stripe';
+      // COD not available in DK
+      if(/betalingslink.*vises|mobilepay.*kort|online.*kort/i.test(reply))ses.paymentMethod='stripe'; // DK: always stripe
 
       addBot(reply);addTime();detectQR(reply);
 
@@ -452,28 +495,37 @@
       if(!hasContactData())scheduleSessionSave('idle_no_contact_bot');
       else if(ses.paymentLinkSent)savePostPaymentUpdate('post_payment_bot_reply');
 
-      const isConfirm=/bestillingen er modtaget|betalingslink vises|i alt.*kr/i.test(reply);
-      if(isConfirm&&(ses.phone||ses.email)&&!ses.paymentLinkSent){
+      const isConfirm=/bestillingen er modtaget|betalingslink vises/i.test(reply);
+      if(isConfirm&&hasFullDeliveryData()&&!ses.paymentLinkSent){
         ses.paymentLinkSent=true;
-        if(ses.paymentMethod==='cod'){
-          const pNum=parseFloat(ses.price)||0;
-          const deliveryVal=ses.delivery||(pNum>=1000?'gratis':'67');
-          const total=ses.total||String(deliveryVal==='gratis'?pNum:pNum+(parseFloat(deliveryVal)||0));
-          ses.delivery=deliveryVal;ses.total=String(total);
-          showCOD(total);fireLead();
-        }else{generateStripe();}
+        generateStripe();
       }
     }catch(e){
       el('bf-log').querySelector('.bf-typing')?.remove();
-      addBot('Ingen forbindelse. Prøv at genindlæse siden.');
+      addBot('Beklager, vi fik ingen forbindelse. Prøv at sende beskeden igen.');
       if(!hasContactData())scheduleSessionSave('idle_error');
+      busy=false;lock(false);el('bf-ta').focus();
     }finally{busy=false;lock(false);el('bf-ta').focus();}
   }
 
   function autoOpen(){
     if(sessionStorage.getItem('bf_auto_done')||sessionStorage.getItem('bf_auto_block'))return;
-    setTimeout(()=>{if(!open&&!sessionStorage.getItem('bf_auto_block')){const t=el('bf-tooltip');if(t)t.style.display='block';}},5000);
-    setTimeout(()=>{if(!open&&!sessionStorage.getItem('bf_auto_block')){sessionStorage.setItem('bf_auto_done','1');openChat();}},30000);
+
+    // Повідомлення біля кнопки після 8 секунд
+    setTimeout(()=>{
+      if(!open&&!sessionStorage.getItem('bf_auto_block')){
+        const t=el('bf-tooltip');
+        if(t)t.style.display='block';
+      }
+    },5000);
+
+    // Автовідкриття через 30 секунд
+    setTimeout(()=>{
+      if(!open&&!sessionStorage.getItem('bf_auto_block')){
+        sessionStorage.setItem('bf_auto_done','1');
+        openChat();
+      }
+    },30000);
   }
 
   function init(){
