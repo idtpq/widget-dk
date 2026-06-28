@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.info('[Bordfolie DK widget V7 loaded]');
+  console.info('[Bordfolie DK widget V8 loaded]');
 
   const WORKER_URL = 'https://bordfolie-dk.metsukisutemi.workers.dev';
   const ASSISTANT_AVATAR_URL = 'https://static.tildacdn.com/stor3530-6335-4030-b366-363966383437/5efb2fc2ea144f1ae0d2f12885474f78.jpg';
@@ -444,7 +444,7 @@
       const res=await fetch(WORKER_URL+'/payment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(buildLeadData({product:ses.product||'Bordfolie',product_formatted:formatProductForTG(),total:finalTotal,payment_method:'stripe',contact:ses.email||ses.phone||ses.contact||''}))});
       const d=await res.json();
       if(d.ok&&d.url){ses.stripeUrl=d.url;ses.stripeSessionId=d.session_id||'';showPayBtn(d.url,finalTotal);await sendLeadWithStripe(d.url);}
-      else{clearPaymentUi();addBot('Problem med betalingslinket. Kontakt os: +48 45 104 05 40');}
+      else{clearPaymentUi();addBot('Problem med betalingslinket. Skriv her i chatten, så hjælper vi med betalingen.');}
     }catch(e){clearPaymentUi();console.error('[BF] Stripe error:',e);}
   }
 
@@ -476,8 +476,9 @@
 
     try{
       const res=await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist})});
-      const data=await res.json();
-      const reply=data.content?.[0]?.text||'Beklager, prøv igen.';
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(data.error || ('HTTP '+res.status));
+      const reply=data.content?.[0]?.text || data.reply || data.message || 'Jeg fik ikke et svar endnu. Skriv gerne igen — så hjælper jeg med målene og prisen.';
       hist.push({role:'assistant',content:reply});
 
       const price=getPriceDK(reply),totalP=getTotalDK(reply),deliveryP=getDeliveryDK(reply),product=getProductDK(reply),addrBot=getAddressFromBotDK(reply);
@@ -502,7 +503,7 @@
       }
     }catch(e){
       el('bf-log').querySelector('.bf-typing')?.remove();
-      addBot('Beklager, vi fik ingen forbindelse. Prøv at sende beskeden igen.');
+      addBot('Der var et kort forbindelsesproblem. Prøv at sende beskeden igen — chatten er stadig åben.');
       if(!hasContactData())scheduleSessionSave('idle_error');
       busy=false;lock(false);el('bf-ta').focus();
     }finally{busy=false;lock(false);el('bf-ta').focus();}
