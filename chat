@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.info('[Bordfolie DK widget V8 loaded]');
+  console.info('[Bordfolie DK widget V18 clean loaded]');
 
   const WORKER_URL = 'https://bordfolie-dk.metsukisutemi.workers.dev';
   const ASSISTANT_AVATAR_URL = 'https://static.tildacdn.com/stor3530-6335-4030-b366-363966383437/5efb2fc2ea144f1ae0d2f12885474f78.jpg';
