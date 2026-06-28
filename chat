@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  console.info('[Bordfolie DK widget V18 clean loaded]');
+  console.info('[Bordfolie DK widget V19 buttons fixed loaded]');
 
   const WORKER_URL = 'https://bordfolie-dk.metsukisutemi.workers.dev';
   const ASSISTANT_AVATAR_URL = 'https://static.tildacdn.com/stor3530-6335-4030-b366-363966383437/5efb2fc2ea144f1ae0d2f12885474f78.jpg';
@@ -199,10 +199,10 @@
 
     if(/slags bordplade|hvilken.*bordplade|mat træ|glas.*lak/i.test(t)){
       setQR(['Mat træ','Glas / lak / blank','Laminat','Jeg har et spørgsmål']);
+    }else if(/1,5mm.*2mm|2mm.*1,5mm|hvilken tykkelse|tykkelse ønsker du|hvilken tykkelse ønsker/i.test(t)&&!ses.price){
+      setQR(['1,5mm — billigere','2mm — mere holdbar','Hvilken skal jeg vælge?']);
     }else if(/intensiv.*brug|køkken.*børn|daglig.*brug|lettere.*brug|sjæld/i.test(t)&&!ses.price){
       setQR(['Køkken / daglig brug','Spisebord / børn','Stue / sjældnere','Skrivebord','Terrasse / have','Ved ikke']);
-    }else if(/1,5mm.*2mm|2mm.*1,5mm|hvilken tykkelse/i.test(t)&&!ses.price){
-      setQR(['1,5mm — billigere','2mm — mere holdbar','Hvilken skal jeg vælge?']);
     }else if(/mål i cm|angiv.*mål|bordmål/i.test(t)&&!ses.price){
       setQR(['80×60 cm','100×80 cm','120×80 cm','140×80 cm','160×90 cm','Andre mål']);
     }else if(/rundt.*bord|firkantet|kvadratisk/i.test(t)){
